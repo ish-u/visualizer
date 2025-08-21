@@ -1,5 +1,5 @@
 main: main.c
-	gcc  main.c -o main `sdl2-config --cflags --libs` 
+	gcc  main.c ./src/gl.c -I./include/ -o main `sdl2-config --cflags --libs` 
 	./main
 
 .PHONY: clean
