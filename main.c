@@ -3,8 +3,8 @@
 #include <SDL.h>
 #include <glad/gl.h>
 
-#define WINDOW_HEIGHT 480
-#define WINDOW_WIDTH 640
+#define WINDOW_HEIGHT 1080
+#define WINDOW_WIDTH 1920
 
 char *readShaderFile(const char *fileName)
 {
@@ -89,14 +89,14 @@ int main(int argc, char *argv[])
 
     // Vertex
     GLfloat vertexPosition[9] = {
-        -0.3f,
-        -0.3f,
+        -1.0f,
+        -1.0f,
         0.0f,
-        0.3f,
-        -0.3f,
+        3.0f,
+        -1.0f,
         0.0f,
-        0.0f,
-        0.3f,
+        -1.0f,
+        3.0f,
         0.0f,
     };
 
@@ -181,16 +181,20 @@ int main(int argc, char *argv[])
     glDisable(GL_CULL_FACE);
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
     glClearColor(0.f, 0.f, 0.f, 0.f);
+    glUseProgram(graphicsPipelineShaderProgram);
 
     // Uniforms
-    GLuint scaleLocation = glGetUniformLocation(graphicsPipelineShaderProgram, "scale");
-    if (scaleLocation == -1)
+    GLuint timeUniformLocation = glGetUniformLocation(graphicsPipelineShaderProgram, "iTime");
+    if (timeUniformLocation == -1)
     {
-        printf("Failed to get uniform 'scale'");
-        return 1;
+        printf("Failed to get uniform 'iTime'");
     }
-
-    glUseProgram(graphicsPipelineShaderProgram);
+    GLuint resolutionUniformLocation = glGetUniformLocation(graphicsPipelineShaderProgram, "iResolution");
+    if (resolutionUniformLocation == -1)
+    {
+        printf("Failed to get uniform 'iResolution'");
+    }
+    glUniform3f(resolutionUniformLocation, WINDOW_WIDTH, WINDOW_HEIGHT, 1);
 
     // Loop
     int quit = 0;
@@ -198,7 +202,7 @@ int main(int argc, char *argv[])
 
     while (!quit)
     {
-        SDL_Delay(1);
+        float time = SDL_GetTicks() / 1000.0f;
         while (SDL_PollEvent(&event))
         {
             if (event.type == SDL_QUIT)
@@ -215,14 +219,7 @@ int main(int argc, char *argv[])
         // Render
         glBindVertexArray(vertexArrayObject);
         glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
-        static float scale = 0.0f;
-        static float delta = 0.005f;
-        scale += delta;
-        if ((scale >= 1.0f) || scale <= -1.0f)
-        {
-            delta *= -1.0f;
-        }
-        glUniform1f(scaleLocation, scale);
+        glUniform1f(timeUniformLocation, time);
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
         // Update window with OpenGL
