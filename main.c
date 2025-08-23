@@ -1,9 +1,42 @@
 #include <stdio.h>
+#include <stdlib.h>
 #include <SDL.h>
 #include <glad/gl.h>
 
 #define WINDOW_HEIGHT 480
 #define WINDOW_WIDTH 640
+
+char *readShaderFile(const char *fileName)
+{
+    // Reading  Shader File in Binary Mode
+    FILE *shaderFile = fopen(fileName, "rb");
+    if (!shaderFile)
+    {
+        printf("Failed to read file: %s", fileName);
+        return NULL;
+    }
+
+    // Getting file size
+    fseek(shaderFile, 0, SEEK_END);
+    long fileSize = ftell(shaderFile);
+    rewind(shaderFile);
+
+    // Allocate Buffer (fileSize + 1 -> for null terminator)
+    char *buffer = malloc(fileSize + 1);
+    if (!buffer)
+    {
+        printf("Failed to malloc");
+        fclose(shaderFile);
+        return NULL;
+    }
+
+    // Read file into buffer
+    fread(buffer, 1, fileSize, shaderFile);
+    buffer[fileSize] = '\0';
+
+    fclose(shaderFile);
+    return buffer;
+}
 
 int main(int argc, char *argv[])
 {
@@ -86,18 +119,8 @@ int main(int argc, char *argv[])
     glDisableVertexAttribArray(0);
 
     // Graphics Pipeline
-    const char *vertexShaderSource =
-        "#version 410 core\n"
-        "in vec4 position;\n"
-        "void main() {\n"
-        "    gl_Position = position;\n"
-        "}\n";
-    const char *fragmentShaderSource =
-        "#version 410 core\n"
-        "out vec4 color;\n"
-        "void main(){\n"
-        "   color = vec4(0.5f, 0.75f, 1.0f, 1.0f);\n"
-        "}\n";
+    const char *vertexShaderSource = readShaderFile("./shaders/vert.glsl");
+    const char *fragmentShaderSource = readShaderFile("./shaders/frag.glsl");
 
     GLuint graphicsPipelineShaderProgram = glCreateProgram();
 
@@ -110,7 +133,10 @@ int main(int argc, char *argv[])
     glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &vertex_compiled);
     if (vertex_compiled != GL_TRUE)
     {
-        printf("Failed to compile vertex shader: %s", SDL_GetError());
+        GLsizei log_length = 0;
+        GLchar message[1024];
+        glGetShaderInfoLog(vertexShader, 1024, &log_length, message);
+        printf("Failed to compile vertex shader: %s", message);
         return 1;
     }
 
@@ -120,7 +146,10 @@ int main(int argc, char *argv[])
     glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &fragment_compiled);
     if (fragment_compiled != GL_TRUE)
     {
-        printf("Failed to compile fragment shader: %s", SDL_GetError());
+        GLsizei log_length = 0;
+        GLchar message[1024];
+        glGetShaderInfoLog(fragmentShader, 1024, &log_length, message);
+        printf("Failed to compile fragment shader: %s", message);
         return 1;
     }
 
@@ -131,7 +160,10 @@ int main(int argc, char *argv[])
     glGetProgramiv(graphicsPipelineShaderProgram, GL_LINK_STATUS, &program_linked);
     if (program_linked != GL_TRUE)
     {
-        printf("Failed to link program: %s", SDL_GetError());
+        GLsizei log_length = 0;
+        GLchar message[1024];
+        glGetProgramInfoLog(graphicsPipelineShaderProgram, 1024, &log_length, message);
+        printf("Failed to link shader program : %s", message);
         return 1;
     }
 
@@ -141,6 +173,8 @@ int main(int argc, char *argv[])
     glDetachShader(graphicsPipelineShaderProgram, fragmentShader);
     glDeleteShader(vertexShader);
     glDeleteShader(fragmentShader);
+    free((void *)vertexShaderSource);
+    free((void *)fragmentShaderSource);
 
     // Setup
     glDisable(GL_DEPTH_TEST);
