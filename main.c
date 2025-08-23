@@ -35,6 +35,11 @@ char *readShaderFile(const char *fileName)
     return buffer;
 }
 
+void audioCaptureCallback(void *userdata, Uint8 *stream, int len)
+{
+    printf("Audio:%d %d %d %d\n", stream[0], stream[1], stream[2], len);
+};
+
 int main(int argc, char *argv[])
 {
     // Pointer to SDL Window Struct
@@ -45,6 +50,40 @@ int main(int argc, char *argv[])
     if (SDL_Init(SDL_INIT_EVERYTHING) < 0)
     {
         printf("Error initialzing SDL: %s", SDL_GetError());
+        return 1;
+    }
+
+    int recordingDeviceCount = SDL_GetNumAudioDevices(SDL_TRUE);
+    if (recordingDeviceCount < 1)
+    {
+        printf("Unable to get audio capture device! SDL Error: %s\n", SDL_GetError());
+        return 0;
+    }
+
+    for (int i = 0; i < recordingDeviceCount; ++i)
+    {
+        const char *deviceName = SDL_GetAudioDeviceName(i, SDL_TRUE);
+        printf("%d - %s\n", i, deviceName);
+    }
+
+    // Audio Capture
+    SDL_AudioDeviceID captureDeviceId = 0;
+    SDL_AudioSpec desiredSpec;
+    SDL_zero(desiredSpec);
+    desiredSpec.freq = 44100;
+    desiredSpec.format = AUDIO_F32;
+    desiredSpec.channels = 2;
+    desiredSpec.samples = 4096;
+    desiredSpec.callback = audioCaptureCallback;
+
+    SDL_AudioSpec obtainedSpec;
+    SDL_zero(obtainedSpec);
+
+    // Hardcoding 1 - BlackHole 2ch
+    captureDeviceId = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(1, SDL_TRUE), SDL_TRUE, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
+    if (captureDeviceId == 0)
+    {
+        printf("Failed to open capture device : %s", SDL_GetError());
         return 1;
     }
 
@@ -67,7 +106,7 @@ int main(int argc, char *argv[])
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
     // Creating Window
-    window = SDL_CreateWindow("Visualizer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN);
+    window = SDL_CreateWindow("Visualizer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN_DESKTOP);
     if (!window)
     {
         printf("Error creating window: %s", SDL_GetError());
@@ -207,6 +246,7 @@ int main(int argc, char *argv[])
     // Loop
     int quit = 0;
     SDL_Event event;
+    SDL_PauseAudioDevice(captureDeviceId, SDL_FALSE);
 
     while (!quit)
     {
@@ -235,6 +275,7 @@ int main(int argc, char *argv[])
     }
 
     // Destroy window
+    SDL_PauseAudioDevice(captureDeviceId, SDL_TRUE);
     SDL_DestroyWindow(window);
 
     // Quit SDL
