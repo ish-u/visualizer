@@ -1,9 +1,9 @@
-#include <glad/gl.h>
 #include <stdio.h>
 #include <SDL.h>
+#include <glad/gl.h>
 
-#define WINDOW_HEIGHT 400
-#define WINDOW_WIDTH 400
+#define WINDOW_HEIGHT 480
+#define WINDOW_WIDTH 640
 
 int main(int argc, char *argv[])
 {
@@ -54,6 +54,77 @@ int main(int argc, char *argv[])
     printf("Version: %s\n", glGetString(GL_VERSION));
     printf("Version: %s\n", glGetString(GL_SHADING_LANGUAGE_VERSION));
 
+    // Vertex
+    GLfloat vertexPosition[9] = {
+        -0.3f,
+        -0.3f,
+        0.0f,
+        0.3f,
+        -0.3f,
+        0.0f,
+        0.0f,
+        0.3f,
+        0.0f,
+    };
+
+    // VAO
+    GLuint vertexArrayObject = 0;
+    glGenVertexArrays(1, &vertexArrayObject);
+    glBindVertexArray(vertexArrayObject);
+
+    // VBO
+    GLuint vertexBufferObject = 0;
+    glGenBuffers(1, &vertexBufferObject);
+    glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
+    glBufferData(GL_ARRAY_BUFFER, sizeof(vertexPosition), &vertexPosition, GL_STATIC_DRAW);
+
+    glEnableVertexAttribArray(0);
+    glVertexAttribPointer(0, 3, GL_FLOAT, GL_FALSE, 0, (void *)0);
+
+    // Clean up
+    glBindVertexArray(0);
+    glDisableVertexAttribArray(0);
+
+    // Graphics Pipeline
+    const char *vertexShaderSource =
+        "#version 410 core\n"
+        "in vec4 position;\n"
+        "void main() {\n"
+        "    gl_Position = position;\n"
+        "}\n";
+    const char *fragmentShaderSource =
+        "#version 410 core\n"
+        "out vec4 color;\n"
+        "void main(){\n"
+        "   color = vec4(0.5f, 0.75f, 1.0f, 1.0f);\n"
+        "}\n";
+
+    GLuint graphicsPipelineShaderProgram = glCreateProgram();
+
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+
+    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+    glCompileShader(vertexShader);
+
+    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+    glCompileShader(fragmentShader);
+
+    glAttachShader(graphicsPipelineShaderProgram, vertexShader);
+    glAttachShader(graphicsPipelineShaderProgram, fragmentShader);
+    glLinkProgram(graphicsPipelineShaderProgram);
+
+    glValidateProgram(graphicsPipelineShaderProgram);
+
+    // Setup
+    glDisable(GL_DEPTH_TEST);
+    glDisable(GL_CULL_FACE);
+    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+    
+    glClearColor(1.f, 1.f, 0.f, 1.f);
+
+    glUseProgram(graphicsPipelineShaderProgram);
+
     // Loop
     int quit = 0;
     SDL_Event event;
@@ -70,6 +141,12 @@ int main(int argc, char *argv[])
                 quit = 1;
             }
         }
+
+        // Render
+        glBindVertexArray(vertexArrayObject);
+        glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
+
+        glDrawArrays(GL_TRIANGLES, 0, 3);
 
         // Update window with OpenGL
         SDL_GL_SwapWindow(window);
