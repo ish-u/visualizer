@@ -180,15 +180,25 @@ int main(int argc, char *argv[])
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-    glClearColor(1.f, 1.f, 0.f, 1.f);
+    glClearColor(0.f, 0.f, 0.f, 0.f);
+
+    // Uniforms
+    GLuint scaleLocation = glGetUniformLocation(graphicsPipelineShaderProgram, "scale");
+    if (scaleLocation == -1)
+    {
+        printf("Failed to get uniform 'scale'");
+        return 1;
+    }
 
     glUseProgram(graphicsPipelineShaderProgram);
 
     // Loop
     int quit = 0;
     SDL_Event event;
+
     while (!quit)
     {
+        SDL_Delay(1);
         while (SDL_PollEvent(&event))
         {
             if (event.type == SDL_QUIT)
@@ -200,10 +210,19 @@ int main(int argc, char *argv[])
                 quit = 1;
             }
         }
+        glClear(GL_COLOR_BUFFER_BIT);
 
         // Render
         glBindVertexArray(vertexArrayObject);
         glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
+        static float scale = 0.0f;
+        static float delta = 0.005f;
+        scale += delta;
+        if ((scale >= 1.0f) || scale <= -1.0f)
+        {
+            delta *= -1.0f;
+        }
+        glUniform1f(scaleLocation, scale);
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
         // Update window with OpenGL
