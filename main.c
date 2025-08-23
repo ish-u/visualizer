@@ -106,21 +106,46 @@ int main(int argc, char *argv[])
 
     glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
     glCompileShader(vertexShader);
+    GLint vertex_compiled;
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &vertex_compiled);
+    if (vertex_compiled != GL_TRUE)
+    {
+        printf("Failed to compile vertex shader: %s", SDL_GetError());
+        return 1;
+    }
 
     glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
     glCompileShader(fragmentShader);
+    GLint fragment_compiled;
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &fragment_compiled);
+    if (fragment_compiled != GL_TRUE)
+    {
+        printf("Failed to compile fragment shader: %s", SDL_GetError());
+        return 1;
+    }
 
     glAttachShader(graphicsPipelineShaderProgram, vertexShader);
     glAttachShader(graphicsPipelineShaderProgram, fragmentShader);
     glLinkProgram(graphicsPipelineShaderProgram);
+    GLint program_linked;
+    glGetProgramiv(graphicsPipelineShaderProgram, GL_LINK_STATUS, &program_linked);
+    if (program_linked != GL_TRUE)
+    {
+        printf("Failed to link program: %s", SDL_GetError());
+        return 1;
+    }
 
     glValidateProgram(graphicsPipelineShaderProgram);
+
+    glDetachShader(graphicsPipelineShaderProgram, vertexShader);
+    glDetachShader(graphicsPipelineShaderProgram, fragmentShader);
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
 
     // Setup
     glDisable(GL_DEPTH_TEST);
     glDisable(GL_CULL_FACE);
     glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-    
     glClearColor(1.f, 1.f, 0.f, 1.f);
 
     glUseProgram(graphicsPipelineShaderProgram);
@@ -145,7 +170,6 @@ int main(int argc, char *argv[])
         // Render
         glBindVertexArray(vertexArrayObject);
         glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
-
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
         // Update window with OpenGL
