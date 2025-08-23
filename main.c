@@ -3,9 +3,6 @@
 #include <SDL.h>
 #include <glad/gl.h>
 
-#define WINDOW_HEIGHT 1080
-#define WINDOW_WIDTH 1920
-
 char *readShaderFile(const char *fileName)
 {
     // Reading  Shader File in Binary Mode
@@ -51,6 +48,17 @@ int main(int argc, char *argv[])
         return 1;
     }
 
+    // Get Screen Resolution
+    SDL_DisplayMode displayMode;
+    if (SDL_GetDesktopDisplayMode(0, &displayMode) != 0)
+    {
+        printf("SDL_GetDesktopDisplayMode failed: %s\n", SDL_GetError());
+        return 1;
+    }
+
+    int WINDOW_WIDTH = displayMode.w;
+    int WINDOW_HEIGHT = displayMode.h;
+
     // Setting OpenGL Attributes
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MINOR_VERSION, 1);
@@ -59,7 +67,7 @@ int main(int argc, char *argv[])
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
     // Creating Window
-    window = SDL_CreateWindow("Visualizer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL);
+    window = SDL_CreateWindow("Visualizer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN);
     if (!window)
     {
         printf("Error creating window: %s", SDL_GetError());
