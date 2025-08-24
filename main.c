@@ -3,6 +3,12 @@
 #include <SDL.h>
 #include <glad/gl.h>
 
+GLuint pcmSamplesUniformLocation = 0;
+GLuint pcmSampleCountUniformLocation = 0;
+
+#define PCM_SAMPLE_SIZE 512
+float pcmSamples[512];
+
 char *readShaderFile(const char *fileName)
 {
     // Reading  Shader File in Binary Mode
@@ -37,7 +43,9 @@ char *readShaderFile(const char *fileName)
 
 void audioCaptureCallback(void *userdata, Uint8 *stream, int len)
 {
-    printf("Audio:%d %d %d %d\n", stream[0], stream[1], stream[2], len);
+    float *samples = (float *)stream;
+    int sampleCount = len / sizeof(float);
+    memcpy(pcmSamples, samples, sizeof(float) * PCM_SAMPLE_SIZE);
 };
 
 int main(int argc, char *argv[])
@@ -80,7 +88,7 @@ int main(int argc, char *argv[])
     SDL_zero(obtainedSpec);
 
     // Hardcoding 1 - BlackHole 2ch
-    captureDeviceId = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(1, SDL_TRUE), SDL_TRUE, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
+    captureDeviceId = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(0, SDL_TRUE), SDL_TRUE, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
     if (captureDeviceId == 0)
     {
         printf("Failed to open capture device : %s", SDL_GetError());
@@ -242,6 +250,11 @@ int main(int argc, char *argv[])
         printf("Failed to get uniform 'iResolution'");
     }
     glUniform3f(resolutionUniformLocation, WINDOW_WIDTH, WINDOW_HEIGHT, 1);
+    GLuint pcmSamplesUniformLocation = glGetUniformLocation(graphicsPipelineShaderProgram, "samples");
+    if (pcmSamplesUniformLocation == -1)
+    {
+        printf("Failed to get uniform 'samples'");
+    }
 
     // Loop
     int quit = 0;
@@ -268,6 +281,7 @@ int main(int argc, char *argv[])
         glBindVertexArray(vertexArrayObject);
         glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
         glUniform1f(timeUniformLocation, time);
+        glUniform1fv(pcmSamplesUniformLocation, PCM_SAMPLE_SIZE, pcmSamples);
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
         // Update window with OpenGL
