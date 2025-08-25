@@ -5,9 +5,11 @@
 
 GLuint pcmSamplesUniformLocation = 0;
 GLuint pcmSampleCountUniformLocation = 0;
+GLuint pcmSampleTexture;
 
-#define PCM_SAMPLE_SIZE 512
-float pcmSamples[512];
+#define PCM_SAMPLE_SIZE 8192
+float pcmSamples[PCM_SAMPLE_SIZE];
+float pcmSampleCount = 0;
 
 char *readShaderFile(const char *fileName)
 {
@@ -250,11 +252,21 @@ int main(int argc, char *argv[])
         printf("Failed to get uniform 'iResolution'");
     }
     glUniform3f(resolutionUniformLocation, WINDOW_WIDTH, WINDOW_HEIGHT, 1);
-    GLuint pcmSamplesUniformLocation = glGetUniformLocation(graphicsPipelineShaderProgram, "samples");
-    if (pcmSamplesUniformLocation == -1)
+
+    // PCM Sample Texture
+    glGenTextures(1, &pcmSampleTexture);
+    glBindTexture(GL_TEXTURE_1D, pcmSampleTexture);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage1D(GL_TEXTURE_1D, 0, GL_R32F, PCM_SAMPLE_SIZE, 0, GL_RED, GL_FLOAT, NULL);
+    GLuint pcmSamplesTextureUniformLocation = glGetUniformLocation(graphicsPipelineShaderProgram, "pcmSampleTexture");
+    if (pcmSamplesTextureUniformLocation == -1)
     {
         printf("Failed to get uniform 'samples'");
     }
+    glUniform1i(pcmSamplesTextureUniformLocation, 0);
 
     // Loop
     int quit = 0;
@@ -281,7 +293,9 @@ int main(int argc, char *argv[])
         glBindVertexArray(vertexArrayObject);
         glBindBuffer(GL_ARRAY_BUFFER, vertexBufferObject);
         glUniform1f(timeUniformLocation, time);
-        glUniform1fv(pcmSamplesUniformLocation, PCM_SAMPLE_SIZE, pcmSamples);
+        glActiveTexture(GL_TEXTURE0);
+        glBindTexture(GL_TEXTURE_1D, pcmSampleTexture);
+        glTexSubImage1D(GL_TEXTURE_1D, 0, 0, PCM_SAMPLE_SIZE, GL_RED, GL_FLOAT, pcmSamples);
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
         // Update window with OpenGL
