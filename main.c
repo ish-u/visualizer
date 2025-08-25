@@ -80,7 +80,7 @@ int main(int argc, char *argv[])
     SDL_AudioDeviceID captureDeviceId = 0;
     SDL_AudioSpec desiredSpec;
     SDL_zero(desiredSpec);
-    desiredSpec.freq = 44100;
+    desiredSpec.freq = 48000;
     desiredSpec.format = AUDIO_F32;
     desiredSpec.channels = 2;
     desiredSpec.samples = 4096;
