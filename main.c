@@ -3,13 +3,24 @@
 #include <SDL.h>
 #include <glad/gl.h>
 
+#define PCM_SAMPLE_SIZE 8192
+#define MAX_PROGRAM_COUNT 10
+
+float pcmSamples[PCM_SAMPLE_SIZE];
+float pcmSampleCount = 0;
 GLuint pcmSamplesUniformLocation = 0;
 GLuint pcmSampleCountUniformLocation = 0;
 GLuint pcmSampleTexture;
 
-#define PCM_SAMPLE_SIZE 8192
-float pcmSamples[PCM_SAMPLE_SIZE];
-float pcmSampleCount = 0;
+GLuint timeUniformLocation = 0;
+GLuint resolutionUniformLocation = 0;
+GLuint pcmSamplesTextureUniformLocation = 0;
+
+int WINDOW_WIDTH = 0;
+int WINDOW_HEIGHT = 0;
+
+int programCount = 0;
+GLuint programs[MAX_PROGRAM_COUNT] = {};
 
 char *readShaderFile(const char *fileName)
 {
@@ -17,7 +28,7 @@ char *readShaderFile(const char *fileName)
     FILE *shaderFile = fopen(fileName, "rb");
     if (!shaderFile)
     {
-        printf("Failed to read file: %s", fileName);
+        printf("Failed to read file: %s\n", fileName);
         return NULL;
     }
 
@@ -49,6 +60,116 @@ void audioCaptureCallback(void *userdata, Uint8 *stream, int len)
     int sampleCount = len / sizeof(float);
     memcpy(pcmSamples, samples, sizeof(float) * PCM_SAMPLE_SIZE);
 };
+
+GLuint createGraphicsProgram(const char *fragmentShaderSourcePath)
+{
+    const char *vertexShaderSource = readShaderFile("./shaders/vert.vs");
+    const char *fragmentShaderSource = readShaderFile(fragmentShaderSourcePath);
+    if (fragmentShaderSource == NULL)
+    {
+        return -1;
+    }
+
+    GLuint graphicsPipelineShaderProgram = glCreateProgram();
+
+    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
+    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
+
+    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
+    glCompileShader(vertexShader);
+    GLint vertex_compiled;
+    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &vertex_compiled);
+    if (vertex_compiled != GL_TRUE)
+    {
+        GLsizei log_length = 0;
+        GLchar message[1024];
+        glGetShaderInfoLog(vertexShader, 1024, &log_length, message);
+        printf("Failed to compile vertex shader: %s", message);
+        return 1;
+    }
+
+    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
+    glCompileShader(fragmentShader);
+    GLint fragment_compiled;
+    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &fragment_compiled);
+    if (fragment_compiled != GL_TRUE)
+    {
+        GLsizei log_length = 0;
+        GLchar message[1024];
+        glGetShaderInfoLog(fragmentShader, 1024, &log_length, message);
+        printf("Failed to compile fragment shader: %s", message);
+        return 1;
+    }
+
+    glAttachShader(graphicsPipelineShaderProgram, vertexShader);
+    glAttachShader(graphicsPipelineShaderProgram, fragmentShader);
+    glLinkProgram(graphicsPipelineShaderProgram);
+    GLint program_linked;
+    glGetProgramiv(graphicsPipelineShaderProgram, GL_LINK_STATUS, &program_linked);
+    if (program_linked != GL_TRUE)
+    {
+        GLsizei log_length = 0;
+        GLchar message[1024];
+        glGetProgramInfoLog(graphicsPipelineShaderProgram, 1024, &log_length, message);
+        printf("Failed to link shader program : %s", message);
+        return 1;
+    }
+
+    glValidateProgram(graphicsPipelineShaderProgram);
+
+    glDetachShader(graphicsPipelineShaderProgram, vertexShader);
+    glDetachShader(graphicsPipelineShaderProgram, fragmentShader);
+    glDeleteShader(vertexShader);
+    glDeleteShader(fragmentShader);
+    free((void *)vertexShaderSource);
+    free((void *)fragmentShaderSource);
+
+    if (programCount < MAX_PROGRAM_COUNT)
+    {
+        programs[programCount++] = graphicsPipelineShaderProgram;
+        return graphicsPipelineShaderProgram;
+    }
+
+    return -1;
+}
+
+GLuint useGraphicsProgram(int index)
+{
+    if (index < programCount)
+    {
+        GLuint graphicsPipelineShaderProgram = programs[index];
+
+        // Setup
+        glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
+        glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
+        glClearColor(0.f, 0.f, 0.f, 0.f);
+        glUseProgram(graphicsPipelineShaderProgram);
+
+        // Uniforms
+        timeUniformLocation = glGetUniformLocation(graphicsPipelineShaderProgram, "iTime");
+        if (timeUniformLocation == -1)
+        {
+            printf("Failed to get uniform 'iTime'\n");
+        }
+        resolutionUniformLocation = glGetUniformLocation(graphicsPipelineShaderProgram, "iResolution");
+        if (resolutionUniformLocation == -1)
+        {
+            printf("Failed to get uniform 'iResolution'\n");
+        }
+        glUniform3f(resolutionUniformLocation, WINDOW_WIDTH, WINDOW_HEIGHT, 1);
+        pcmSamplesTextureUniformLocation = glGetUniformLocation(graphicsPipelineShaderProgram, "pcmSampleTexture");
+        if (pcmSamplesTextureUniformLocation == -1)
+        {
+            printf("Failed to get uniform 'pcmSampleTexture'\n");
+        }
+        glUniform1i(pcmSamplesTextureUniformLocation, 0);
+
+        return graphicsPipelineShaderProgram;
+    }
+
+    return -1;
+}
 
 int main(int argc, char *argv[])
 {
@@ -90,7 +211,7 @@ int main(int argc, char *argv[])
     SDL_zero(obtainedSpec);
 
     // Hardcoding 1 - BlackHole 2ch
-    captureDeviceId = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(0, SDL_TRUE), SDL_TRUE, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
+    captureDeviceId = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(1, SDL_TRUE), SDL_TRUE, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
     if (captureDeviceId == 0)
     {
         printf("Failed to open capture device : %s", SDL_GetError());
@@ -99,14 +220,14 @@ int main(int argc, char *argv[])
 
     // Get Screen Resolution
     SDL_DisplayMode displayMode;
-    if (SDL_GetDesktopDisplayMode(0, &displayMode) != 0)
+    if (SDL_GetDesktopDisplayMode(1, &displayMode) != 0)
     {
         printf("SDL_GetDesktopDisplayMode failed: %s\n", SDL_GetError());
         return 1;
     }
 
-    int WINDOW_WIDTH = displayMode.w;
-    int WINDOW_HEIGHT = displayMode.h;
+    WINDOW_WIDTH = displayMode.w;
+    WINDOW_HEIGHT = displayMode.h;
 
     // Setting OpenGL Attributes
     SDL_GL_SetAttribute(SDL_GL_CONTEXT_MAJOR_VERSION, 4);
@@ -116,7 +237,7 @@ int main(int argc, char *argv[])
     SDL_GL_SetAttribute(SDL_GL_DEPTH_SIZE, 24);
 
     // Creating Window
-    window = SDL_CreateWindow("Visualizer", SDL_WINDOWPOS_UNDEFINED, SDL_WINDOWPOS_UNDEFINED, WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL | SDL_WINDOW_FULLSCREEN_DESKTOP);
+    window = SDL_CreateWindow("Visualizer", SDL_WINDOWPOS_UNDEFINED_DISPLAY(1), SDL_WINDOWPOS_UNDEFINED_DISPLAY(1), WINDOW_WIDTH, WINDOW_HEIGHT, SDL_WINDOW_OPENGL | SDL_WINDOW_BORDERLESS);
     if (!window)
     {
         printf("Error creating window: %s", SDL_GetError());
@@ -175,84 +296,6 @@ int main(int argc, char *argv[])
     glBindVertexArray(0);
     glDisableVertexAttribArray(0);
 
-    // Graphics Pipeline
-    const char *vertexShaderSource = readShaderFile("./shaders/vert.glsl");
-    const char *fragmentShaderSource = readShaderFile("./shaders/frag.glsl");
-
-    GLuint graphicsPipelineShaderProgram = glCreateProgram();
-
-    GLuint vertexShader = glCreateShader(GL_VERTEX_SHADER);
-    GLuint fragmentShader = glCreateShader(GL_FRAGMENT_SHADER);
-
-    glShaderSource(vertexShader, 1, &vertexShaderSource, NULL);
-    glCompileShader(vertexShader);
-    GLint vertex_compiled;
-    glGetShaderiv(vertexShader, GL_COMPILE_STATUS, &vertex_compiled);
-    if (vertex_compiled != GL_TRUE)
-    {
-        GLsizei log_length = 0;
-        GLchar message[1024];
-        glGetShaderInfoLog(vertexShader, 1024, &log_length, message);
-        printf("Failed to compile vertex shader: %s", message);
-        return 1;
-    }
-
-    glShaderSource(fragmentShader, 1, &fragmentShaderSource, NULL);
-    glCompileShader(fragmentShader);
-    GLint fragment_compiled;
-    glGetShaderiv(fragmentShader, GL_COMPILE_STATUS, &fragment_compiled);
-    if (fragment_compiled != GL_TRUE)
-    {
-        GLsizei log_length = 0;
-        GLchar message[1024];
-        glGetShaderInfoLog(fragmentShader, 1024, &log_length, message);
-        printf("Failed to compile fragment shader: %s", message);
-        return 1;
-    }
-
-    glAttachShader(graphicsPipelineShaderProgram, vertexShader);
-    glAttachShader(graphicsPipelineShaderProgram, fragmentShader);
-    glLinkProgram(graphicsPipelineShaderProgram);
-    GLint program_linked;
-    glGetProgramiv(graphicsPipelineShaderProgram, GL_LINK_STATUS, &program_linked);
-    if (program_linked != GL_TRUE)
-    {
-        GLsizei log_length = 0;
-        GLchar message[1024];
-        glGetProgramInfoLog(graphicsPipelineShaderProgram, 1024, &log_length, message);
-        printf("Failed to link shader program : %s", message);
-        return 1;
-    }
-
-    glValidateProgram(graphicsPipelineShaderProgram);
-
-    glDetachShader(graphicsPipelineShaderProgram, vertexShader);
-    glDetachShader(graphicsPipelineShaderProgram, fragmentShader);
-    glDeleteShader(vertexShader);
-    glDeleteShader(fragmentShader);
-    free((void *)vertexShaderSource);
-    free((void *)fragmentShaderSource);
-
-    // Setup
-    glDisable(GL_DEPTH_TEST);
-    glDisable(GL_CULL_FACE);
-    glViewport(0, 0, WINDOW_WIDTH, WINDOW_HEIGHT);
-    glClearColor(0.f, 0.f, 0.f, 0.f);
-    glUseProgram(graphicsPipelineShaderProgram);
-
-    // Uniforms
-    GLuint timeUniformLocation = glGetUniformLocation(graphicsPipelineShaderProgram, "iTime");
-    if (timeUniformLocation == -1)
-    {
-        printf("Failed to get uniform 'iTime'");
-    }
-    GLuint resolutionUniformLocation = glGetUniformLocation(graphicsPipelineShaderProgram, "iResolution");
-    if (resolutionUniformLocation == -1)
-    {
-        printf("Failed to get uniform 'iResolution'");
-    }
-    glUniform3f(resolutionUniformLocation, WINDOW_WIDTH, WINDOW_HEIGHT, 1);
-
     // PCM Sample Texture
     glGenTextures(1, &pcmSampleTexture);
     glBindTexture(GL_TEXTURE_1D, pcmSampleTexture);
@@ -261,12 +304,15 @@ int main(int argc, char *argv[])
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexImage1D(GL_TEXTURE_1D, 0, GL_R32F, PCM_SAMPLE_SIZE, 0, GL_RED, GL_FLOAT, NULL);
-    GLuint pcmSamplesTextureUniformLocation = glGetUniformLocation(graphicsPipelineShaderProgram, "pcmSampleTexture");
-    if (pcmSamplesTextureUniformLocation == -1)
-    {
-        printf("Failed to get uniform 'samples'");
-    }
-    glUniform1i(pcmSamplesTextureUniformLocation, 0);
+
+    // Graphics Programs
+    createGraphicsProgram("./shaders/pcm.fs");
+    createGraphicsProgram("./shaders/grid.fs");
+    createGraphicsProgram("./shaders/squares.fs");
+    createGraphicsProgram("./shaders/hearts.fs");
+
+    int currentGraphicsProgramIndex = 0;
+    useGraphicsProgram(currentGraphicsProgramIndex);
 
     // Loop
     int quit = 0;
@@ -284,7 +330,22 @@ int main(int argc, char *argv[])
             }
             if (event.type == SDL_KEYDOWN)
             {
-                quit = 1;
+                switch (event.key.keysym.sym)
+                {
+                case SDLK_LEFT:
+                    currentGraphicsProgramIndex = (currentGraphicsProgramIndex - 1) % programCount;
+                    useGraphicsProgram(currentGraphicsProgramIndex);
+                    break;
+                case SDLK_RIGHT:
+                    currentGraphicsProgramIndex = (currentGraphicsProgramIndex + 1) % programCount;
+                    useGraphicsProgram(currentGraphicsProgramIndex);
+                    break;
+                case SDLK_q:
+                    quit = 1;
+                    break;
+                default:
+                    break;
+                }
             }
         }
         glClear(GL_COLOR_BUFFER_BIT);
