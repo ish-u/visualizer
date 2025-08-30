@@ -5,6 +5,7 @@
 #include <glad/gl.h>
 
 #define PCM_SAMPLE_SIZE 8192
+#define FFT_SAMPLE_SIZE 8192
 #define MAX_PROGRAM_COUNT 10
 
 float pcmSamples[PCM_SAMPLE_SIZE];
@@ -13,9 +14,16 @@ GLuint pcmSamplesUniformLocation = 0;
 GLuint pcmSampleCountUniformLocation = 0;
 GLuint pcmSampleTexture;
 
+float fftSamples[FFT_SAMPLE_SIZE];
+float fftSampleCount = 0;
+GLuint fftSamplesUniformLocation = 0;
+GLuint fftSampleCountUniformLocation = 0;
+GLuint fftSampleTexture;
+
 GLuint timeUniformLocation = 0;
 GLuint resolutionUniformLocation = 0;
 GLuint pcmSamplesTextureUniformLocation = 0;
+GLuint fftSamplesTextureUniformLocation = 0;
 
 int WINDOW_WIDTH = 0;
 int WINDOW_HEIGHT = 0;
@@ -119,15 +127,15 @@ void audioCaptureCallback(void *userdata, Uint8 *stream, int len)
 {
     float *samples = (float *)stream;
     int sampleCount = len / sizeof(float);
+    memcpy(pcmSamples, samples, sizeof(float) * PCM_SAMPLE_SIZE);
 
-    float *fftSamples = getFFTSamples(samples, sampleCount);
+    float *getFFTSamplesResult = getFFTSamples(samples, sampleCount);
     for (int i = 0; i < 10; i++)
     {
-        printf("%f\n", fftSamples[i]);
+        printf("%f\n", getFFTSamplesResult[i]);
     }
-    free(fftSamples);
-
-    memcpy(pcmSamples, samples, sizeof(float) * PCM_SAMPLE_SIZE);
+    memcpy(fftSamples, getFFTSamplesResult, sizeof(float) * FFT_SAMPLE_SIZE);
+    free(getFFTSamplesResult);
 };
 
 GLuint createGraphicsProgram(const char *fragmentShaderSourcePath)
@@ -233,6 +241,12 @@ GLuint useGraphicsProgram(int index)
             printf("Failed to get uniform 'pcmSampleTexture'\n");
         }
         glUniform1i(pcmSamplesTextureUniformLocation, 0);
+        fftSamplesTextureUniformLocation = glGetUniformLocation(graphicsPipelineShaderProgram, "fftSampleTexture");
+        if (fftSamplesTextureUniformLocation == -1)
+        {
+            printf("Failed to get uniform 'fftSampleTexture'\n");
+        }
+        glUniform1i(fftSamplesTextureUniformLocation, 1);
 
         return graphicsPipelineShaderProgram;
     }
@@ -374,7 +388,17 @@ int main(int argc, char *argv[])
     glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
     glTexImage1D(GL_TEXTURE_1D, 0, GL_R32F, PCM_SAMPLE_SIZE, 0, GL_RED, GL_FLOAT, NULL);
 
+    // PCM Sample Texture
+    glGenTextures(1, &fftSampleTexture);
+    glBindTexture(GL_TEXTURE_1D, fftSampleTexture);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_S, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_WRAP_T, GL_REPEAT);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MIN_FILTER, GL_LINEAR);
+    glTexParameteri(GL_TEXTURE_1D, GL_TEXTURE_MAG_FILTER, GL_LINEAR);
+    glTexImage1D(GL_TEXTURE_1D, 0, GL_R32F, FFT_SAMPLE_SIZE, 0, GL_RED, GL_FLOAT, NULL);
+
     // Graphics Programs
+    createGraphicsProgram("./shaders/fft.fs");
     createGraphicsProgram("./shaders/pcm.fs");
     createGraphicsProgram("./shaders/grid.fs");
     createGraphicsProgram("./shaders/squares.fs");
@@ -426,6 +450,9 @@ int main(int argc, char *argv[])
         glActiveTexture(GL_TEXTURE0);
         glBindTexture(GL_TEXTURE_1D, pcmSampleTexture);
         glTexSubImage1D(GL_TEXTURE_1D, 0, 0, PCM_SAMPLE_SIZE, GL_RED, GL_FLOAT, pcmSamples);
+        glActiveTexture(GL_TEXTURE1);
+        glBindTexture(GL_TEXTURE_1D, fftSampleTexture);
+        glTexSubImage1D(GL_TEXTURE_1D, 0, 0, FFT_SAMPLE_SIZE, GL_RED, GL_FLOAT, fftSamples);
         glDrawArrays(GL_TRIANGLES, 0, 3);
 
         // Update window with OpenGL
