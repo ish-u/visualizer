@@ -1,5 +1,6 @@
 #include <stdio.h>
 #include <stdlib.h>
+#include <complex.h>
 #include <SDL.h>
 #include <glad/gl.h>
 
@@ -53,11 +54,79 @@ char *readShaderFile(const char *fileName)
     fclose(shaderFile);
     return buffer;
 }
+// Ref -
+//  - https://en.wikipedia.org/wiki/Cooley%E2%80%93Tukey_FFT_algorithm
+//  - https://www.math.wustl.edu/~victor/mfmm/fourier/fft.c
+//  - https://rosettacode.org/wiki/Fast_Fourier_transform#C
+void ditfft2(complex float *fft, int N)
+{
+    if (N == 1)
+    {
+        return;
+    }
+
+    complex float *evenFFT =
+        malloc(sizeof(complex float) * N / 2);
+    complex float *oddFFT =
+        malloc(sizeof(complex float) * N / 2);
+    for (int i = 0; i < N; i++)
+    {
+        if (i % 2 == 0)
+        {
+            evenFFT[i / 2] = fft[i];
+        }
+        else
+        {
+            oddFFT[i / 2] = fft[i];
+        }
+    }
+    ditfft2(evenFFT, N / 2);
+    ditfft2(oddFFT, N / 2);
+
+    for (int i = 0; i < N / 2; i++)
+    {
+        complex float p = evenFFT[i];
+        complex float q = cexp(-2.0 * M_PI * I * i / N) * oddFFT[i];
+        fft[i] = p + q;
+        fft[i + N / 2] = p - q;
+    }
+
+    free(evenFFT);
+    free(oddFFT);
+}
+
+float *getFFTSamples(float *pcm, int sampleCount)
+{
+    complex float *fft = malloc(sizeof(complex float) * sampleCount);
+    for (int i = 0; i < sampleCount; i++)
+    {
+        fft[i] = pcm[i] + I * 0.0;
+    }
+    ditfft2(fft, sampleCount);
+
+    float *fftMag = malloc(sizeof(float) * sampleCount);
+    for (int i = 0; i < sampleCount; i++)
+    {
+        fftMag[i] = cabs(fft[i]);
+    }
+
+    free(fft);
+
+    return fftMag;
+}
 
 void audioCaptureCallback(void *userdata, Uint8 *stream, int len)
 {
     float *samples = (float *)stream;
     int sampleCount = len / sizeof(float);
+
+    float *fftSamples = getFFTSamples(samples, sampleCount);
+    for (int i = 0; i < 10; i++)
+    {
+        printf("%f\n", fftSamples[i]);
+    }
+    free(fftSamples);
+
     memcpy(pcmSamples, samples, sizeof(float) * PCM_SAMPLE_SIZE);
 };
 
@@ -220,7 +289,7 @@ int main(int argc, char *argv[])
 
     // Get Screen Resolution
     SDL_DisplayMode displayMode;
-    if (SDL_GetDesktopDisplayMode(1, &displayMode) != 0)
+    if (SDL_GetDesktopDisplayMode(0, &displayMode) != 0)
     {
         printf("SDL_GetDesktopDisplayMode failed: %s\n", SDL_GetError());
         return 1;
