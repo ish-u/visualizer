@@ -4,8 +4,12 @@
 #include <SDL.h>
 #include <glad/gl.h>
 
-#define PCM_SAMPLE_SIZE 8192
-#define FFT_SAMPLE_SIZE 8192
+#define CHANNELS 2
+#define FREQUENCY 48000
+#define SAMPLES 4096
+#define PCM_SAMPLE_SIZE SAMPLES * 2
+#define PCM_MONO_SAMPLE_SIZE PCM_SAMPLE_SIZE / 2
+#define FFT_SAMPLE_SIZE PCM_MONO_SAMPLE_SIZE / 2
 #define MAX_PROGRAM_COUNT 10
 
 float pcmSamples[PCM_SAMPLE_SIZE];
@@ -77,16 +81,10 @@ void ditfft2(complex float *fft, int N)
         malloc(sizeof(complex float) * N / 2);
     complex float *oddFFT =
         malloc(sizeof(complex float) * N / 2);
-    for (int i = 0; i < N; i++)
+    for (int i = 0; i < N / 2; i++)
     {
-        if (i % 2 == 0)
-        {
-            evenFFT[i / 2] = fft[i];
-        }
-        else
-        {
-            oddFFT[i / 2] = fft[i];
-        }
+        evenFFT[i] = fft[2 * i];
+        oddFFT[i] = fft[2 * i + 1];
     }
     ditfft2(evenFFT, N / 2);
     ditfft2(oddFFT, N / 2);
@@ -105,20 +103,35 @@ void ditfft2(complex float *fft, int N)
 
 float *getFFTSamples(float *pcm, int sampleCount)
 {
-    complex float *fft = malloc(sizeof(complex float) * sampleCount);
-    for (int i = 0; i < sampleCount; i++)
+    // Get Mono PCM Data
+    int monoSampleCount = sampleCount / 2;
+    float *pcmMono = malloc(sizeof(float) * monoSampleCount);
+    for (int i = 0; i < monoSampleCount; i++)
     {
-        fft[i] = pcm[i] + I * 0.0;
+        float left = pcm[2 * i];
+        float right = pcm[2 * i + 1];
+        pcmMono[i] = 0.5f * (left + right);
     }
-    ditfft2(fft, sampleCount);
 
-    float *fftMag = malloc(sizeof(float) * sampleCount);
-    for (int i = 0; i < sampleCount; i++)
+    // Get FFT from Mono PCM Data
+    complex float *fft = malloc(sizeof(complex float) * monoSampleCount);
+    for (int i = 0; i < monoSampleCount; i++)
     {
-        fftMag[i] = cabs(fft[i]);
+        // Applying Han Window -
+        float w = 0.5f * (1 - cosf(2 * M_PI * i / (monoSampleCount - 1)));
+        fft[i] = pcmMono[i] * w + I * 0.0;
+    }
+    ditfft2(fft, monoSampleCount);
+
+    // Convert FFT Data to Magnitude - Only half of the sample count is useful
+    float *fftMag = malloc(sizeof(float) * (monoSampleCount / 2));
+    for (int i = 0; i < monoSampleCount / 2; i++)
+    {
+        fftMag[i] = cabsf(fft[i]);
     }
 
     free(fft);
+    free(pcmMono);
 
     return fftMag;
 }
@@ -284,17 +297,17 @@ int main(int argc, char *argv[])
     SDL_AudioDeviceID captureDeviceId = 0;
     SDL_AudioSpec desiredSpec;
     SDL_zero(desiredSpec);
-    desiredSpec.freq = 48000;
+    desiredSpec.freq = FREQUENCY;
     desiredSpec.format = AUDIO_F32;
-    desiredSpec.channels = 2;
-    desiredSpec.samples = 4096;
+    desiredSpec.channels = CHANNELS;
+    desiredSpec.samples = SAMPLES;
     desiredSpec.callback = audioCaptureCallback;
 
     SDL_AudioSpec obtainedSpec;
     SDL_zero(obtainedSpec);
 
-    // Hardcoding 1 - BlackHole 2ch
-    captureDeviceId = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(1, SDL_TRUE), SDL_TRUE, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
+    // Hardcoding 0 - BlackHole 2ch
+    captureDeviceId = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(0, SDL_TRUE), SDL_TRUE, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
     if (captureDeviceId == 0)
     {
         printf("Failed to open capture device : %s", SDL_GetError());
