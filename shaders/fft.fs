@@ -9,9 +9,9 @@ out vec4 outColor;
 
 void mainImage( out vec4 fragColor, in vec2 fragCoord )
 {
-    vec2 uv = (2.0 * fragCoord - iResolution.xy) / iResolution.y;
-    float y =  step(uv.y  + ((texture(fftSampleTexture, uv.x).x)), 0.0f);
-    vec3 col = vec3(y * (vec3(0,2,4))); 
+    vec2 uv = (fragCoord) / iResolution.xy;
+    float y =  step(uv.y, ((texture(fftSampleTexture, uv.x).x)));
+    vec3 col = vec3(y); 
     fragColor = vec4(col,1.0);
 }
 

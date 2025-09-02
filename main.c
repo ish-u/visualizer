@@ -143,10 +143,6 @@ void audioCaptureCallback(void *userdata, Uint8 *stream, int len)
     memcpy(pcmSamples, samples, sizeof(float) * PCM_SAMPLE_SIZE);
 
     float *getFFTSamplesResult = getFFTSamples(samples, sampleCount);
-    for (int i = 0; i < 10; i++)
-    {
-        printf("%f\n", getFFTSamplesResult[i]);
-    }
     memcpy(fftSamples, getFFTSamplesResult, sizeof(float) * FFT_SAMPLE_SIZE);
     free(getFFTSamplesResult);
 };
@@ -306,8 +302,8 @@ int main(int argc, char *argv[])
     SDL_AudioSpec obtainedSpec;
     SDL_zero(obtainedSpec);
 
-    // Hardcoding 0 - BlackHole 2ch
-    captureDeviceId = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(0, SDL_TRUE), SDL_TRUE, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
+    // Hardcoding 1 - BlackHole 2ch
+    captureDeviceId = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(1, SDL_TRUE), SDL_TRUE, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
     if (captureDeviceId == 0)
     {
         printf("Failed to open capture device : %s", SDL_GetError());
