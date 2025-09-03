@@ -1,5 +1,3 @@
-// Shader - https://www.shadertoy.com/view/t3dGWj
-
 #version 410 core
 uniform vec3 iResolution;
 uniform float iTime;

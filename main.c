@@ -127,7 +127,10 @@ float *getFFTSamples(float *pcm, int sampleCount)
     float *fftMag = malloc(sizeof(float) * (monoSampleCount / 2));
     for (int i = 0; i < monoSampleCount / 2; i++)
     {
-        fftMag[i] = cabsf(fft[i]);
+        // Logaritimic Scale - Better for Visuals
+        fftMag[i] = 20. * log10f(cabsf(fft[i]) + 1e-6f);
+        // maps [-120,0] → [0,1]
+        fftMag[i] = (fftMag[i] + 120.0f) / 120.0f;
     }
 
     free(fft);
