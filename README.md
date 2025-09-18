@@ -2,7 +2,8 @@
 
 An audio visualizer made using SDL and OpenGL.
 
-![demo](./demo.gif)
+![](./demo_img.png)
+![](./demo.gif)
 
 ## Install
 
