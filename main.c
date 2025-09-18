@@ -305,8 +305,8 @@ int main(int argc, char *argv[])
     SDL_AudioSpec obtainedSpec;
     SDL_zero(obtainedSpec);
 
-    // Hardcoding 1 - BlackHole 2ch
-    captureDeviceId = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(1, SDL_TRUE), SDL_TRUE, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
+    // Hardcoding 0 - BlackHole 2ch
+    captureDeviceId = SDL_OpenAudioDevice(SDL_GetAudioDeviceName(0, SDL_TRUE), SDL_TRUE, &desiredSpec, &obtainedSpec, SDL_AUDIO_ALLOW_FORMAT_CHANGE);
     if (captureDeviceId == 0)
     {
         printf("Failed to open capture device : %s", SDL_GetError());
@@ -410,8 +410,9 @@ int main(int argc, char *argv[])
     glTexImage1D(GL_TEXTURE_1D, 0, GL_R32F, FFT_SAMPLE_SIZE, 0, GL_RED, GL_FLOAT, NULL);
 
     // Graphics Programs
-    createGraphicsProgram("./shaders/fft.fs");
     createGraphicsProgram("./shaders/pcm.fs");
+    createGraphicsProgram("./shaders/fft.fs");
+    createGraphicsProgram("./shaders/sandwich.fs");
     createGraphicsProgram("./shaders/grid.fs");
     createGraphicsProgram("./shaders/squares.fs");
     createGraphicsProgram("./shaders/hearts.fs");
